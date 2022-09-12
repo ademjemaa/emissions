@@ -19,10 +19,16 @@ export const getEmissions = async (_, res) => {
 export const getCountries = async (_, res) => {
   try {
     const { data } = await api.get(`/countries.json`);
-    const payload = Object.entries(data).map(([key, value]) => ({
-      label: value,
-      value: key,
-    }));
+    const payload = Object.entries(data)
+      .map(([key, value]) => ({
+        label: value,
+        value: key,
+      }))
+      .sort(
+        (a, b) =>
+          a.label.toLowerCase().charCodeAt(0) -
+          b.label.toLowerCase().charCodeAt(0)
+      );
 
     res.status(200).json(payload);
   } catch (error) {
@@ -34,78 +40,74 @@ export const getCountries = async (_, res) => {
 
 export const getAverage = async (req, res) => {
   try {
-    if (!req.body instanceof Array) throw new Error("Invalid request body");
-
+    const { product, trips } = req.body;
+    if (!trips instanceof Array) throw new Error("Invalid request body");
     let tripTotal = 0;
     let tripDays = 0;
     const details = await Promise.all(
-      req.body.map(
-        async ({ country, product, begin, end, longitude, latitude }) => {
-          const params = new URLSearchParams({
-            begin,
-            end,
-          });
+      trips.map(async ({ country, begin, end, longitude, latitude }) => {
+        const params = new URLSearchParams({
+          begin,
+          end,
+        });
 
-          if (country) {
-            params.append("country", country);
-          } else {
-            params.append("point", longitude);
-            params.append("point", latitude);
-          }
+        if (country) {
+          params.append("country", country);
+        } else {
+          params.append("point", longitude);
+          params.append("point", latitude);
+        }
 
-          const { data } = await api.get(`/${product}/average.json`, {
-            params,
-          });
+        const { data } = await api.get(`/${product}/average.json`, {
+          params,
+        });
 
-          const days = Math.abs(
-            differenceInDays(new Date(end), new Date(begin))
+        const days = Math.abs(differenceInDays(new Date(end), new Date(begin)));
+
+        if (!data.length)
+          return {
+            total: 0,
+            days: 0,
+          };
+
+        const formattedData = data
+          .sort((a, b) => new Date(a.start) - new Date(b.start))
+          .reduce((prev, cur) => {
+            prev[format(new Date(cur.start), "yyyy-MM-dd")] = cur.average;
+            return prev;
+          }, {});
+
+        tripDays += days;
+
+        let selectedFormattedDataKey = Object.keys(formattedData)[0];
+
+        const generatedData = new Array(days).fill(null).map((_, i) => {
+          const formattedDate = format(
+            addDays(new Date(begin), i),
+            "yyyy-MM-dd"
           );
 
-          if (!data.length)
-            return {
-              total: 0,
-              days: 0,
-            };
-
-          const formattedData = data
-            .sort((a, b) => new Date(a.start) - new Date(b.start))
-            .reduce((prev, cur) => {
-              prev[format(new Date(cur.start), "yyyy-MM-dd")] = cur.average;
-              return prev;
-            }, {});
-
-          tripDays += days;
-
-          let selectedFormattedDataKey = Object.keys(formattedData)[0];
-
-          const generatedData = new Array(days).fill(null).map((_, i) => {
-            const formattedDate = format(
-              addDays(new Date(begin), i),
-              "yyyy-MM-dd"
-            );
-
-            if (formattedData[formattedDate]) {
-              selectedFormattedDataKey = formattedDate;
-            }
-
-            return {
-              date: formattedDate,
-              average: formattedData[selectedFormattedDataKey],
-            };
-          });
-
-          const total = generatedData.reduce((prev, cur) => {
-            return prev + cur.average;
-          }, 0);
-
-          tripTotal += total;
+          if (formattedData[formattedDate]) {
+            selectedFormattedDataKey = formattedDate;
+          }
 
           return {
-            total: total / days,
-            days,
+            date: formattedDate,
+            average: formattedData[selectedFormattedDataKey],
           };
-        }
-      )
+        });
+
+        const total = generatedData.reduce((prev, cur) => {
+          return prev + cur.average;
+        }, 0);
+
+        tripTotal += total;
+
+        return {
+          total: total / days,
+          days,
+        };
+      })
     );
 
     const response = {

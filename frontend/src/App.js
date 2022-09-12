@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000",
+  baseURL: "https://carbonmonoxide.herokuapp.com/",
 });
 
 const FieldArrayItem = ({
@@ -19,15 +19,15 @@ const FieldArrayItem = ({
 
   useEffect(() => {
     if (useCoords) {
-      unregister(`payload.${index}.country`);
+      unregister(`trips.${index}.country`);
     } else {
-      unregister(`payload.${index}.latitude`);
-      unregister(`payload.${index}.longitude`);
+      unregister(`trips.${index}.latitude`);
+      unregister(`trips.${index}.longitude`);
     }
   }, [index, unregister, useCoords]);
 
   return (
-    <div className="grid grid-cols-5 gap-4 col-span-5">
+    <div className="grid grid-cols-4 gap-4 col-span-4">
       <div className="flex flex-col">
         {useCoords ? (
           <div className="grid grid-cols-2 gap-4">
@@ -37,7 +37,7 @@ const FieldArrayItem = ({
               <input
                 required
                 className="border rounded-lg p-2 font-bold"
-                {...register(`payload.${index}.longitude`)}
+                {...register(`trips.${index}.longitude`)}
               />
             </div>
             <div className="flex flex-col">
@@ -46,7 +46,7 @@ const FieldArrayItem = ({
               <input
                 required
                 className="border rounded-lg p-2 font-bold"
-                {...register(`payload.${index}.latitude`)}
+                {...register(`trips.${index}.latitude`)}
               />
             </div>
           </div>
@@ -57,7 +57,7 @@ const FieldArrayItem = ({
             <select
               required
               className="border rounded-lg p-2 font-bold"
-              {...register(`payload.${index}.country`)}
+              {...register(`trips.${index}.country`)}
             >
               {countries.map((country) => (
                 <option key={country.value} value={country.value}>
@@ -84,27 +84,12 @@ const FieldArrayItem = ({
         </div>
       </div>
       <div className="flex flex-col">
-        <label className="font-bold text-sm">Emission</label>
-
-        <select
-          required
-          className="border rounded-lg p-2 font-bold capitalize"
-          {...register(`payload.${index}.product`)}
-        >
-          {products.map((product) => (
-            <option key={product.product_variable} value={product.name}>
-              {product.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="flex flex-col">
         <label className="font-bold text-sm">Start Date</label>
 
         <input
           required
           className="border rounded-lg p-2 font-bold"
-          {...register(`payload.${index}.begin`)}
+          {...register(`trips.${index}.begin`)}
           type="date"
         />
       </div>
@@ -114,7 +99,7 @@ const FieldArrayItem = ({
         <input
           required
           className="border rounded-lg p-2 font-bold"
-          {...register(`payload.${index}.end`)}
+          {...register(`trips.${index}.end`)}
           type="date"
         />
       </div>
@@ -158,7 +143,7 @@ const App = () => {
 
   const { control, register, handleSubmit, unregister } = useForm();
   const { fields, append, remove } = useFieldArray({
-    name: "payload",
+    name: "trips",
     control: control,
   });
 
@@ -166,10 +151,10 @@ const App = () => {
     if (!fields.length) append();
   }, [append, fields.length]);
 
-  const handleFormSubmit = async ({ payload }) => {
+  const handleFormSubmit = async (values) => {
     try {
       setLoading(true);
-      const { data } = await api.post("/average", payload);
+      const { data } = await api.post("/average", values);
       setAverages(data);
     } catch (error) {
       console.error(error);
@@ -188,9 +173,24 @@ const App = () => {
   return (
     <div className="container mx-auto py-12">
       <form
-        className="grid gap-3 grid-cols-5"
+        className="grid gap-3 grid-cols-4"
         onSubmit={handleSubmit(handleFormSubmit)}
       >
+        <div className="flex flex-col col-span-full">
+          <label className="font-bold text-sm">Emission</label>
+
+          <select
+            required
+            className="border rounded-lg p-2 font-bold capitalize"
+            {...register(`product`)}
+          >
+            {products.map((product) => (
+              <option key={product.product_variable} value={product.name}>
+                {product.name}
+              </option>
+            ))}
+          </select>
+        </div>
         {fields.map((field, index) => (
           <FieldArrayItem
             field={field}
@@ -206,14 +206,14 @@ const App = () => {
         <button
           type="button"
           onClick={() => append()}
-          className="px-8 py-2 bg-emerald-300 hover:bg-emerald-800 transition-colors text-emerald-800 hover:text-emerald-300 rounded-lg shadow-md  shadow-emerald-100 font-bold col-start-5"
+          className="px-8 py-2 bg-emerald-300 hover:bg-emerald-800 transition-colors text-emerald-800 hover:text-emerald-300 rounded-lg shadow-md  shadow-emerald-100 font-bold col-start-4"
         >
           Add Location
         </button>
         <button
           disabled={loading}
           type="submit"
-          className="px-8 py-2 bg-cyan-300 hover:bg-cyan-800 transition-colors text-cyan-800 hover:text-cyan-300 rounded-lg shadow-md  shadow-cyan-100 font-bold col-start-5 mt-20 disabled:opacity-50 disabled:cursor-wait"
+          className="px-8 py-2 bg-cyan-300 hover:bg-cyan-800 transition-colors text-cyan-800 hover:text-cyan-300 rounded-lg shadow-md  shadow-cyan-100 font-bold col-start-4 mt-20 disabled:opacity-50 disabled:cursor-wait"
         >
           Submit
         </button>
@@ -224,15 +224,15 @@ const App = () => {
       ) : (
         <div className="grid gap-2">
           <p>
-            <b>Total emissions : </b> {averages.total}
+            <b>Total emissions : </b> {averages.total} ppm
           </p>
           <p>
-            <b>Average emissions : </b> {averages.average}
+            <b>Average emissions : </b> {averages.average} ppm per day
           </p>
 
           {averages.details.map((average, index) => (
             <p key={index}>
-              An average of <b>{average.total}</b> mol/m² for{" "}
+              An average of <b>{average.total}</b> ppm a day for{" "}
               <b>{average.days}</b> days.
             </p>
           ))}
